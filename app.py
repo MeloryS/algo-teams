@@ -1,6 +1,8 @@
 import json
 import os
 import requests
+import random
+import string
 import numpy as np
 
 import config
@@ -24,6 +26,7 @@ class algoTeamsAPI:
         )
 
         response_json = response.json()
+        print(response_json)
 
         # Invite users to channel
         requests.post(
@@ -71,12 +74,19 @@ class algoTeamsAPI:
         response_json = response.json()
         return (response_json["ok"])
     
+    def randomString(self, stringLength=8):
+        """Generates a random string for channel naming"""
+        return ''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(stringLength))
+    
     def naiveGroupAssignment(self, num_channel, users):
         """Splits users into num_channel channels"""
-        split_user_arrays = [x.tolist() for x in np.array_split(users, num_channel)]
-        return(split_user_arrays)
+        # Separate users into num_channel arrays
+        split_user_arrays = [group.tolist() for group in np.array_split(users, num_channel)]
+        user_arrays = [', '.join(group) for group in split_user_arrays]
 
+        for group in user_arrays:
+            name = self.randomString()
+            self.createChannel(name, group)
+        
 if __name__ == '__main__':
     api = algoTeamsAPI()
-    # cc = api.createChannel("testcreatechannel", "U0159QC3QDB, U015CKGB5GD")
-    print(api.naiveGroupAssignment(3, [1, 2, 3]))
