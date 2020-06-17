@@ -81,7 +81,7 @@ class algoTeamsAPI:
     def naiveGroupAssignment(self, num_channel, users):
         """Splits users into num_channel channels"""
         # Separate users into num_channel arrays
-        users = random.shuffle(users)
+        random.shuffle(users)
         split_user_arrays = [group.tolist() for group in np.array_split(users, num_channel)]
         user_arrays = [', '.join(group) for group in split_user_arrays]
 
@@ -91,3 +91,4 @@ class algoTeamsAPI:
         
 if __name__ == '__main__':
     api = algoTeamsAPI()
+    api.naiveGroupAssignment(1, ["U0159QC3QDB", "U015CKGB5GD"])
