@@ -11,7 +11,7 @@ class algoTeamsAPI:
     def __init__(self):
         self.URL = "https://slack.com/api/"
         self.token = config.token
-        self.headers={"Content-Type": "application/json", "Authorization": "Bearer {}".format(config.token)}
+        self.headers = {"Content-Type": "application/json", "Authorization": "Bearer {}".format(config.token)}
 
     def createChannel(self, channel_name, users):
         """Create a new Channel with given users"""        
@@ -81,6 +81,7 @@ class algoTeamsAPI:
     def naiveGroupAssignment(self, num_channel, users):
         """Splits users into num_channel channels"""
         # Separate users into num_channel arrays
+        users = random.shuffle(users)
         split_user_arrays = [group.tolist() for group in np.array_split(users, num_channel)]
         user_arrays = [', '.join(group) for group in split_user_arrays]
 
