@@ -2,7 +2,7 @@
 Studying how to create effective virtual teams with the help of machine learning algorithms
 
 ## Local Setup 
-1. Install dependencies by running following command:
+1. Install dependencies:
 ```
 pip install requirements.txt
 ```
