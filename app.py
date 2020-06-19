@@ -108,22 +108,25 @@ class networkGraph:
 
     # Network efficiency: average path length between two nodes in the collaboration graph
     def get_efficiency(self):
-        weights = []
-        for t in self.teams:
-            pairs = combinations(t, 2)
-            for p in pairs:
-                print (p[0], p[1])
-                weights.append(len((nx.shortest_path(self.G, p[0], p[1])))-1)
-        return statistics.mean(weights)
+        path_lengths = []
+        for c in nx.connected_components(self.G):
+            path_lengths.append(nx.average_shortest_path_length(self.G.subgraph(c).copy()))
+        return statistics.mean(path_lengths)
     
     # Tie strength: average edge weight between people who are in the same team
     def get_tie_strength(self):
-        return
+        edge_weights = []
+        for t in self.teams:
+            pairs = combinations(t, 2)
+            for p in pairs:
+                edge_weights.append(self.G[p[0]][p[1]]['weight'])
+        return statistics.mean(edge_weights)
 
 if __name__ == '__main__':
     network = networkGraph([str(x) for x in list(range(10))])
     network.naive_group_assignment(5)
     # print(network.G.edges)
     # print(network.teams)
-    print(network.get_efficiency())
+    print (network.get_efficiency())
+    print (network.get_tie_strength())
     # api.naiveGroupAssignment(1, ["U0159QC3QDB", "U015CKGB5GD"])
