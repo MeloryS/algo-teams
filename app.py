@@ -6,6 +6,7 @@ import string
 import numpy as np
 import networkx as nx
 import config
+import statistics
 from itertools import combinations
 
 class algoTeamsAPI:
@@ -85,8 +86,8 @@ class algoTeamsAPI:
         user_arrays = [', '.join(group) for group in split_user_arrays]
 
         for group in user_arrays:
-            name = self.randomString()
-            self.create_channel(name, group)
+            name = self.random_string()
+        #     self.create_channel(name, group)
 
         return split_user_arrays
 
@@ -107,15 +108,22 @@ class networkGraph:
 
     # Network efficiency: average path length between two nodes in the collaboration graph
     def get_efficiency(self):
-        return
+        weights = []
+        for t in self.teams:
+            pairs = combinations(t, 2)
+            for p in pairs:
+                print (p[0], p[1])
+                weights.append(len((nx.shortest_path(self.G, p[0], p[1])))-1)
+        return statistics.mean(weights)
     
     # Tie strength: average edge weight between people who are in the same team
     def get_tie_strength(self):
         return
 
 if __name__ == '__main__':
-    network = networkGraph([str(x) for x in list(range(20))])
+    network = networkGraph([str(x) for x in list(range(10))])
     network.naive_group_assignment(5)
-    print(network.G.edges)
-    print(network.teams)
+    # print(network.G.edges)
+    # print(network.teams)
+    print(network.get_efficiency())
     # api.naiveGroupAssignment(1, ["U0159QC3QDB", "U015CKGB5GD"])
