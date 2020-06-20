@@ -8,6 +8,7 @@ import networkx as nx
 import config
 import statistics
 from itertools import combinations
+from copy import deepcopy
 
 class algoTeamsAPI:
     def __init__(self):
@@ -52,7 +53,7 @@ class algoTeamsAPI:
         return(response_json)
     
     # Invite user to given channel
-    def add_user(self, channel, user):
+    def add_user(self, user, channel):
         response = requests.post(
             url=self.url+"/conversations.invite",
             data=json.dumps({
@@ -64,7 +65,7 @@ class algoTeamsAPI:
         return (response_json["ok"])
 
     # Remove user from given channel
-    def remove_user(self, channel, user):
+    def remove_user(self, user, channel):
         response = requests.post(
             url=self.url+"/conversations.kick",
             data=json.dumps({
@@ -91,22 +92,6 @@ class algoTeamsAPI:
 
         return split_user_arrays
 
-# Network efficiency: average path length between two nodes in the collaboration graph
-def get_efficiency(graph):
-    path_lengths = []
-    for c in nx.connected_components(graph):
-        path_lengths.append(nx.average_shortest_path_length(graph.subgraph(c).copy()))
-    return statistics.mean(path_lengths)
-    
-# Tie strength: average edge weight between people who are in the same team
-def get_tie_strength(graph, teams):
-    edge_weights = []
-    for t in teams:
-        pairs = combinations(t, 2)
-        for p in pairs:
-            edge_weights.append(graph[p[0]][p[1]]['weight'])
-    return statistics.mean(edge_weights)
-
 class networkGraph:
     def __init__(self, users):
         self.G = nx.Graph()
@@ -121,47 +106,75 @@ class networkGraph:
             pairs = combinations(t, 2)
             for p in pairs:
                 self.G.add_weighted_edges_from([(p[0], p[1], 1)])
+    
+    # Network efficiency: average path length between two nodes in the graph
+    def get_efficiency(self):
+        path_lengths = []
+        for c in nx.connected_components(self.G):
+            path_lengths.append(nx.average_shortest_path_length(self.G.subgraph(c).copy()))
+        return statistics.mean(path_lengths)
+    
+    # Tie strength: average edge weight between people who are in the same team
+    def get_tie_strength(self):
+        try:
+            edge_weights = []
+            for t in self.teams:
+                pairs = combinations(t, 2)
+                for p in pairs:
+                    edge_weights.append(self.G[p[0]][p[1]]['weight'])
+            return statistics.mean(edge_weights)
+        except (KeyError):
+            return ('p[0]: {}, p[1]: {}'.format(p[0], p[1]))
 
-    # Creates a random, valid move
+    # Generates a random, valid swap move
     def valid_move(self):
-        teams_copy = self.teams.copy()
-        random_team = random.choice(self.teams)
-        random_user = random.choice(random_team)
-        teams_copy.remove(random_team)
-        new_team = random.choice(teams_copy)
-        return([random_user, new_team])
-
-    # Moves a user to another team
-    def transform(self, user, team):
-        G_copy = self.G.copy()
-        teams_copy = self.teams
-        # Update teams array
-        for t in teams_copy:
-            if user in t: 
-                t.remove(user)
-            elif t == team:
-                t.append(user)
-
-        # Update graph
+        team_a, team_b = random.sample(self.teams, 2)
+        return([random.choice(team_a), random.choice(team_b)])
+    
+    # Adds user to a team
+    def add_user_to_team(self, user, team):
+        team.append(user)
         for member in team:
-            if (not (G_copy.has_edge(user, member) or  user == member)):
-                G_copy.add_weighted_edges_from([(user, member, 1)])
-        
-        return (G_copy, teams_copy)
+            if (not (self.G.has_edge(user, member) or user == member)):
+                self.G.add_weighted_edges_from([(user, member, 1)])
 
-    def stochastic_search(self):
-        s_current = []
-        return
+    # Swaps two users if they're in different teams
+    def transform(self, user_a, user_b, alpha):      
+        for t in self.teams:
+            if user_a in t and user_b in t:
+                return alpha*self.get_tie_strength() + (1-alpha)*self.get_efficiency()
+
+            if user_a in t:
+                t.remove(user_a)
+                self.add_user_to_team(user_b, t)
+            elif user_b in t:
+                t.remove(user_b)
+                self.add_user_to_team(user_a, t)
+    
+        return alpha*self.get_tie_strength() + (1-alpha)*self.get_efficiency()
+
+def stochastic_search(network, eps):
+    s_current = []
+    G_current = deepcopy(network)
+    for i in range(5):
+        s_candidate = G_current.valid_move()
+        s_current.append(s_candidate)
+
+        G_prime = deepcopy(network)
+        G_prime_transform = G_prime.transform(s_candidate[0], s_candidate[1], 0.5)
+
+        G_current_transform = G_current.transform(s_candidate[0], s_candidate[1], 0.5)
+    return (G_prime_transform, G_current_transform)
 
 if __name__ == '__main__':
-    network = networkGraph([str(x) for x in list(range(10))])
+    network = networkGraph([str(x) for x in list(range(20))])
     network.naive_group_assignment(5)
-    # print(network.G.edges)
-    # print(network.teams)
-    # print (network.G.edges)
-    # print (network.teams)
-    random_move = network.valid_move()
-    print (random_move)
-    transform = network.transform(random_move[0], random_move[1])
-    print (transform[0].edges)
-    # api.naiveGroupAssignment(1, ["U0159QC3QDB", "U015CKGB5GD"])
+    for i in range(20):
+        print (stochastic_search(network, 0.005))
+
+    # for i in range(1000):
+    #     move = network.valid_move()
+    #     transform = network.transform(move[0], move[1], 0.5)
+    #     if (i%100 == 0):
+    #         print (network.get_tie_strength())
+    #         print (network.get_efficiency())
