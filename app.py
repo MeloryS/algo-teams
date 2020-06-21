@@ -12,10 +12,11 @@ from itertools import combinations
 from copy import deepcopy
 
 class algoTeamsAPI:
-    def __init__(self):
+    def __init__(self, network):
         self.URL = "https://slack.com/api/"
         self.token = config.token
         self.headers = {"Content-Type": "application/json", "Authorization": "Bearer {}".format(config.token)}
+        self.network = network
 
     # Create a new Channel with given users
     def create_channel(self, channel_name, users):
@@ -82,10 +83,9 @@ class algoTeamsAPI:
         return ''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(string_length))
     
     # Splits users into num_channel channels
-    def naive_group_assignment(self, num_channel, users):
-        random.shuffle(users)
-        split_user_arrays = [group.tolist() for group in np.array_split(users, num_channel)]
-        user_arrays = [', '.join(group) for group in split_user_arrays]
+    def naive_group_assignment(self, num_channel):
+        network.naive_group_assignment(num_channel)
+        user_arrays = [', '.join(group) for group in network.teams]
 
         for group in user_arrays:
             name = self.random_string()
@@ -99,14 +99,15 @@ class networkGraph:
         self.G.add_nodes_from(users)
         self.users = users
         self.teams = []
-        self.api = algoTeamsAPI()
         
     def naive_group_assignment(self, num_channel):
-        self.teams = self.api.naive_group_assignment(num_channel, self.users)
+        random.shuffle(self.users)
+        self.teams = [group.tolist() for group in np.array_split(self.users, num_channel)]
         for t in self.teams:
             pairs = combinations(t, 2)
             for p in pairs:
                 self.G.add_weighted_edges_from([(p[0], p[1], 1)])
+        return self.teams
     
     # Network efficiency: average path length between two nodes in the graph
     def get_efficiency(self):
@@ -177,4 +178,4 @@ class networkGraph:
 
 if __name__ == '__main__':
     network = networkGraph([str(x) for x in list(range(50))])
-    network.naive_group_assignment(10)
+    print(network.naive_group_assignment(10))
