@@ -152,22 +152,25 @@ class networkGraph:
     
         return alpha*self.get_tie_strength() + (1-alpha)*self.get_efficiency()
 
-    def stochastic_search(self, eps):
+    def stochastic_search(self, eps, alpha=0.5):
         s_current = []
         G_current = deepcopy(self)
-        for i in range(50):
+        while True:
             s_candidate = G_current.valid_move()
             s_current.append(s_candidate)
 
             G_prime = deepcopy(self)
-            G_prime_transform = G_prime.transform(s_candidate[0], s_candidate[1], 0.5)
+            G_prime_transform = G_prime.transform(s_candidate[0], s_candidate[1], alpha)
 
-            G_current_transform = G_current.transform(s_candidate[0], s_candidate[1], 0.5)
-        if (G_prime_transform > G_current_transform):
-            s_current = [s_candidate]
-        return (s_current)
+            G_current_transform = G_current.transform(s_candidate[0], s_candidate[1], alpha)
+            if (G_prime_transform > G_current_transform):
+                s_current = [s_candidate]
+                print (G_prime_transform, G_current_transform)
+
+            if (random.random() < eps):
+                return s_current
 
 if __name__ == '__main__':
     network = networkGraph([str(x) for x in list(range(20))])
     network.naive_group_assignment(5)
-    print (network.stochastic_search(0.005))
+    print (network.stochastic_search(0.0005))
