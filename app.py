@@ -5,6 +5,7 @@ import random
 import string
 import numpy as np
 import networkx as nx
+import math
 import config
 import statistics
 from itertools import combinations
@@ -93,7 +94,7 @@ class algoTeamsAPI:
         return split_user_arrays
 
 class networkGraph:
-    def __init__(self, users):
+    def __init__(self, users=[]):
         self.G = nx.Graph()
         self.G.add_nodes_from(users)
         self.users = users
@@ -109,10 +110,14 @@ class networkGraph:
     
     # Network efficiency: average path length between two nodes in the graph
     def get_efficiency(self):
-        path_lengths = []
+        path_lengths = 0
+        paths = 0
         for c in nx.connected_components(self.G):
-            path_lengths.append(nx.average_shortest_path_length(self.G.subgraph(c).copy()))
-        return statistics.mean(path_lengths)
+            subgraph = self.G.subgraph(c).copy()
+            path_lengths += nx.average_shortest_path_length(subgraph)*(math.comb(subgraph.number_of_nodes(), 2))
+            paths += math.comb(subgraph.number_of_nodes(), 2)
+        if paths == 0: return 0
+        return path_lengths/paths
     
     # Tie strength: average edge weight between people who are in the same team
     def get_tie_strength(self):
@@ -171,6 +176,5 @@ class networkGraph:
                 return s_current
 
 if __name__ == '__main__':
-    network = networkGraph([str(x) for x in list(range(20))])
-    network.naive_group_assignment(5)
-    print (network.stochastic_search(0.0005))
+    network = networkGraph([str(x) for x in list(range(50))])
+    network.naive_group_assignment(10)
