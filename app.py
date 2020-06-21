@@ -143,8 +143,7 @@ class networkGraph:
         for t in self.teams:
             if user_a in t and user_b in t:
                 return alpha*self.get_tie_strength() + (1-alpha)*self.get_efficiency()
-
-            if user_a in t:
+            elif user_a in t:
                 t.remove(user_a)
                 self.add_user_to_team(user_b, t)
             elif user_b in t:
@@ -153,28 +152,22 @@ class networkGraph:
     
         return alpha*self.get_tie_strength() + (1-alpha)*self.get_efficiency()
 
-def stochastic_search(network, eps):
-    s_current = []
-    G_current = deepcopy(network)
-    for i in range(5):
-        s_candidate = G_current.valid_move()
-        s_current.append(s_candidate)
+    def stochastic_search(self, eps):
+        s_current = []
+        G_current = deepcopy(self)
+        for i in range(50):
+            s_candidate = G_current.valid_move()
+            s_current.append(s_candidate)
 
-        G_prime = deepcopy(network)
-        G_prime_transform = G_prime.transform(s_candidate[0], s_candidate[1], 0.5)
+            G_prime = deepcopy(self)
+            G_prime_transform = G_prime.transform(s_candidate[0], s_candidate[1], 0.5)
 
-        G_current_transform = G_current.transform(s_candidate[0], s_candidate[1], 0.5)
-    return (G_prime_transform, G_current_transform)
+            G_current_transform = G_current.transform(s_candidate[0], s_candidate[1], 0.5)
+        if (G_prime_transform > G_current_transform):
+            s_current = [s_candidate]
+        return (s_current)
 
 if __name__ == '__main__':
     network = networkGraph([str(x) for x in list(range(20))])
     network.naive_group_assignment(5)
-    for i in range(20):
-        print (stochastic_search(network, 0.005))
-
-    # for i in range(1000):
-    #     move = network.valid_move()
-    #     transform = network.transform(move[0], move[1], 0.5)
-    #     if (i%100 == 0):
-    #         print (network.get_tie_strength())
-    #         print (network.get_efficiency())
+    print (network.stochastic_search(0.005))
