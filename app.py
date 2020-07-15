@@ -166,13 +166,17 @@ class networkGraph:
         team.append(user)
         for member in team:
             if (not (self.G.has_edge(user, member) or user == member)):
-                self.G.add_weighted_edges_from([(user, member, np.random.normal(0.5))])
+                self.G.add_weighted_edges_from([(user, member, 1)])
+    
+    def efficiency_tie_strength_obj_eq(self, alpha):
+        return alpha*self.get_tie_strength() + (1-alpha)*self.get_efficiency()
 
     # Swaps two users if they're in different teams
     def transform(self, user_a, user_b, alpha):      
         for t in self.teams:
             if user_a in t and user_b in t:
-                return alpha*self.get_tie_strength() + (1-alpha)*self.get_efficiency()
+                # return -self.get_diversity() + self.get_efficiency()*len(self.users)
+                return -self.get_diversity()
             elif user_a in t:
                 t.remove(user_a)
                 self.add_user_to_team(user_b, t)
@@ -180,32 +184,30 @@ class networkGraph:
                 t.remove(user_b)
                 self.add_user_to_team(user_a, t)
     
-        # return alpha*self.get_tie_strength() + (1-alpha)*self.get_efficiency()
-        return -self.get_diversity() + self.get_efficiency()*len(self.users)
+        # return -self.get_diversity() + self.get_efficiency()*len(self.users)
+        return -self.get_diversity()
 
     def stochastic_search(self, eps, alpha=0.5):
         s_current = []
-        G_current = deepcopy(self)
         while True:
             s_candidate = self.valid_move()
-            s_current.append(s_candidate)
 
-            G_prime = deepcopy(G_current)
+            G_prime = deepcopy(self)
             G_prime_transform = G_prime.transform(s_candidate[0], s_candidate[1], alpha)
 
-            G_current_transform = self.transform(s_candidate[0], s_candidate[1], alpha)
-
-            if (G_prime_transform > G_current_transform):
-                s_current = [s_candidate]
-                self = deepcopy(G_prime)
+            if (G_prime_transform > -self.get_diversity()):
+                s_current.append(s_candidate)
+                self.transform(s_candidate[0], s_candidate[1], alpha)
 
             if (random.random() < eps):
                 return s_current
 
 if __name__ == '__main__':
-    network = networkGraph(list(range(50)))
-    network.naive_group_assignment(10)
+    network = networkGraph(list(range(12)))
+    network.naive_group_assignment(3)
+    print(network.get_diversity())
     print(network.stochastic_search(0.05))
+    print(network.get_diversity())
 
     # nx.draw(network.G)
     # plt.show()
