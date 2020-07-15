@@ -8,6 +8,7 @@ import networkx as nx
 import math
 import config
 import statistics
+import matplotlib.pyplot as plt
 from itertools import combinations
 from copy import deepcopy
 
@@ -94,19 +95,28 @@ class algoTeamsAPI:
         return split_user_arrays
 
 class networkGraph:
-    def __init__(self, users=[]):
-        self.G = nx.Graph()
+    def __init__(self, users):
+        self.G = nx.Graph() # Network graph representation
+        # self.B = nx.Graph()
         self.G.add_nodes_from(users)
         self.users = users
+        self.clusters = [random.choice(['a', 'b', 'c', 'd']) for i in users]
         self.teams = []
         
     def naive_group_assignment(self, num_channel):
         random.shuffle(self.users)
         self.teams = [group.tolist() for group in np.array_split(self.users, num_channel)]
-        for t in self.teams:
+        for i in range(num_channel):
+            t = self.teams[i]
             pairs = combinations(t, 2)
+            
             for p in pairs:
                 self.G.add_weighted_edges_from([(p[0], p[1], np.random.normal(0.5))])
+            
+            # self.B.add_node('TEAM ' + str(i))
+            # for member in t:
+            #     self.B.add_weighted_edges_from([(member, 'TEAM ' + str(i), 1)])
+
         return self.teams
     
     # Network efficiency: average path length between two nodes in the graph
@@ -131,6 +141,20 @@ class networkGraph:
             return statistics.mean(edge_weights)
         except (KeyError):
             return ('p[0]: {}, p[1]: {}'.format(p[0], p[1]))
+    
+    def get_diversity(self):
+        f = 0
+        for t in self.teams:
+            count = dict()
+            for m in t:
+                membership = self.clusters[m]       # Checks which group the member is in
+                if membership in count:
+                    count[membership] += 1          # Appends 1 if count exists
+                else:
+                    count[membership] = 1           # Starts count otherwise
+            for c in count:
+                f += (count[c])**2
+        return f
 
     # Generates a random, valid swap move
     def valid_move(self):
@@ -156,22 +180,24 @@ class networkGraph:
                 t.remove(user_b)
                 self.add_user_to_team(user_a, t)
     
-        return alpha*self.get_tie_strength() + (1-alpha)*self.get_efficiency()
+        # return alpha*self.get_tie_strength() + (1-alpha)*self.get_efficiency()
+        return -self.get_diversity() + self.get_efficiency()*len(self.users)
 
     def stochastic_search(self, eps, alpha=0.5):
         s_current = []
         G_current = deepcopy(self)
         while True:
-            s_candidate = G_current.valid_move()
+            s_candidate = self.valid_move()
             s_current.append(s_candidate)
 
-            G_prime = deepcopy(self)
+            G_prime = deepcopy(G_current)
             G_prime_transform = G_prime.transform(s_candidate[0], s_candidate[1], alpha)
 
-            G_current_transform = G_current.transform(s_candidate[0], s_candidate[1], alpha)
+            G_current_transform = self.transform(s_candidate[0], s_candidate[1], alpha)
+
             if (G_prime_transform > G_current_transform):
                 s_current = [s_candidate]
-                print (G_prime_transform, G_current_transform)
+                self = deepcopy(G_prime)
 
             if (random.random() < eps):
                 return s_current
@@ -179,4 +205,7 @@ class networkGraph:
 if __name__ == '__main__':
     network = networkGraph(list(range(50)))
     network.naive_group_assignment(10)
-    print (network.stochastic_search(0.05))
+    print(network.stochastic_search(0.05))
+
+    # nx.draw(network.G)
+    # plt.show()
