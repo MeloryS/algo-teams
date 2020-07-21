@@ -183,8 +183,9 @@ class networkGraph:
         return f
     
     def get_norm_diversity(self):
+        min_diversity = len(self.users)
         max_diversity = len(self.users)**2
-        return (max_diversity-self.get_diversity())/(max_diversity)
+        return 1-(self.get_diversity()-min_diversity)/(max_diversity-min_diversity)
 
     def get_team_diversity(self):
         diverse_teams = []
@@ -213,7 +214,7 @@ class networkGraph:
         for t in self.teams:
             if user_a in t and user_b in t:
                 # return -self.get_diversity() + self.get_efficiency()*len(self.users)
-                return -self.get_diversity()
+                return self.get_norm_diversity()
             elif user_a in t:
                 t.remove(user_a)
                 self.add_user_to_team(user_b, t)
@@ -240,19 +241,16 @@ class networkGraph:
                 return s_current
 
 if __name__ == '__main__':
-    network = networkGraph(list(range(20)))
+    network = networkGraph(list(range(12)))
     network.naive_group_assignment(4)
-    # print(network.get_team_diversity())
-    # print(network.get_norm_diversity())
-    # print(network.get_diversity())
-    print(network.get_efficiency())
-    print(network.get_norm_diversity())
-    network.stochastic_search(0.05)
-    print(network.get_efficiency())
-    # print(network.get_norm_diversity())
-    # print(network.get_diversity())
+
     # print(network.get_efficiency())
-    # print(network.get_team_diversity())
+    print(network.get_norm_diversity())
+    print(network.get_diversity())
+    network.stochastic_search(0.05)
+    print(network.get_norm_diversity())
+    print(network.get_diversity())
+    # print(network.get_efficiency())
 
     # nx.draw(network.G)
     # plt.show()
