@@ -9,7 +9,7 @@ import math
 import config
 import statistics
 import matplotlib.pyplot as plt
-from itertools import combinations
+from itertools import combinations, permutations
 from copy import deepcopy
 
 class algoTeamsAPI:
@@ -120,15 +120,41 @@ class networkGraph:
         return self.teams
     
     # Network efficiency: average path length between two nodes in the graph
+    # def get_efficiency(self):
+    #     path_lengths = 0
+    #     paths = 0
+    #     for c in nx.connected_components(self.G):
+    #         subgraph = self.G.subgraph(c).copy()
+    #         path_lengths += nx.average_shortest_path_length(subgraph)*(math.comb(subgraph.number_of_nodes(), 2))
+    #         paths += math.comb(subgraph.number_of_nodes(), 2)
+    #     if paths == 0: return 0
+    #     return path_lengths/paths
+
     def get_efficiency(self):
         path_lengths = 0
         paths = 0
         for c in nx.connected_components(self.G):
             subgraph = self.G.subgraph(c).copy()
-            path_lengths += nx.average_shortest_path_length(subgraph)*(math.comb(subgraph.number_of_nodes(), 2))
-            paths += math.comb(subgraph.number_of_nodes(), 2)
+            pairs = combinations(subgraph.nodes, 2)
+            
+            for p in pairs:
+                for path in nx.all_simple_paths(self.G, source = p[0], target = p[1]):
+                    path_lengths += len(path) - 1
+                    # print (len(path) - 1)
+                    paths += 1
+
         if paths == 0: return 0
         return path_lengths/paths
+
+    def get_norm_efficiency(self):
+        min_efficiency = 0
+        for t in self.teams:
+            min_efficiency += len(nx.all_simple_paths)
+        min_efficiency = min_efficiency/len(self.teams)
+
+        max_efficiency = len(self.users) - 1
+        # return (self.get_efficiency()-min_efficiency)/max_efficiency
+        return min_efficiency
     
     # Tie strength: average edge weight between people who are in the same team
     def get_tie_strength(self):
@@ -155,6 +181,17 @@ class networkGraph:
             for c in count:
                 f += (count[c])**2
         return f
+    
+    def get_norm_diversity(self):
+        max_diversity = len(self.users)**2
+        return (max_diversity-self.get_diversity())/(max_diversity)
+
+    def get_team_diversity(self):
+        diverse_teams = []
+        for t in self.teams:
+            team = [self.clusters[i] for i in t]
+            diverse_teams.append(team)
+        return diverse_teams
 
     # Generates a random, valid swap move
     def valid_move(self):
@@ -183,9 +220,9 @@ class networkGraph:
             elif user_b in t:
                 t.remove(user_b)
                 self.add_user_to_team(user_a, t)
-    
-        # return -self.get_diversity() + self.get_efficiency()*len(self.users)
-        return -self.get_diversity()
+        
+        return self.get_norm_diversity()
+        # return -self.get_diversity()
 
     def stochastic_search(self, eps, alpha=0.5):
         s_current = []
@@ -195,7 +232,7 @@ class networkGraph:
             G_prime = deepcopy(self)
             G_prime_transform = G_prime.transform(s_candidate[0], s_candidate[1], alpha)
 
-            if (G_prime_transform > -self.get_diversity()):
+            if (G_prime_transform > self.get_norm_diversity()):
                 s_current.append(s_candidate)
                 self.transform(s_candidate[0], s_candidate[1], alpha)
 
@@ -203,11 +240,19 @@ class networkGraph:
                 return s_current
 
 if __name__ == '__main__':
-    network = networkGraph(list(range(12)))
-    network.naive_group_assignment(3)
-    print(network.get_diversity())
-    print(network.stochastic_search(0.05))
-    print(network.get_diversity())
+    network = networkGraph(list(range(20)))
+    network.naive_group_assignment(4)
+    # print(network.get_team_diversity())
+    # print(network.get_norm_diversity())
+    # print(network.get_diversity())
+    print(network.get_efficiency())
+    print(network.get_norm_diversity())
+    network.stochastic_search(0.05)
+    print(network.get_efficiency())
+    # print(network.get_norm_diversity())
+    # print(network.get_diversity())
+    # print(network.get_efficiency())
+    # print(network.get_team_diversity())
 
     # nx.draw(network.G)
     # plt.show()
