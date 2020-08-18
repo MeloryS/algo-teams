@@ -101,7 +101,19 @@ class networkGraph:
         self.G.add_nodes_from(users)
         self.users = users
         self.clusters = [random.choice(['a', 'b', 'c', 'd']) for i in users]
+        self.utility_one = [random.random() for i in users]
+        self.utility_two = [random.random() for i in users]
         self.teams = []
+
+        for user in self.users:
+            if self.clusters[user] == 'a':
+                self.G.nodes[user]['viz'] = {'color': {'r': 255, 'g': 0, 'b': 0, 'a': 0}}
+            elif self.clusters[user] == 'b':
+                self.G.nodes[user]['viz'] = {'color': {'r': 0, 'g': 255, 'b': 0, 'a': 0}}
+            elif self.clusters[user] == 'c':
+                self.G.nodes[user]['viz'] = {'color': {'r': 0, 'g': 0, 'b': 255, 'a': 0}}
+            elif self.clusters[user] == 'd':
+                self.G.nodes[user]['viz'] = {'color': {'r': 0, 'g': 0, 'b': 0, 'a': 255}}
         
     def naive_group_assignment(self, num_channel):
         random.shuffle(self.users)
@@ -119,17 +131,6 @@ class networkGraph:
 
         return self.teams
     
-    # Network efficiency: average path length between two nodes in the graph
-    # def get_efficiency(self):
-    #     path_lengths = 0
-    #     paths = 0
-    #     for c in nx.connected_components(self.G):
-    #         subgraph = self.G.subgraph(c).copy()
-    #         path_lengths += nx.average_shortest_path_length(subgraph)*(math.comb(subgraph.number_of_nodes(), 2))
-    #         paths += math.comb(subgraph.number_of_nodes(), 2)
-    #     if paths == 0: return 0
-    #     return path_lengths/paths
-
     def get_efficiency(self):
         path_lengths = 0
         paths = 0
@@ -140,7 +141,6 @@ class networkGraph:
             for p in pairs:
                 for path in nx.all_simple_paths(self.G, source = p[0], target = p[1]):
                     path_lengths += len(path) - 1
-                    # print (len(path) - 1)
                     paths += 1
 
         if paths == 0: return 0
@@ -149,12 +149,11 @@ class networkGraph:
     def get_norm_efficiency(self):
         min_efficiency = 0
         for t in self.teams:
-            min_efficiency += len(nx.all_simple_paths)
+            min_efficiency += len(list(combinations(t, 2)))
         min_efficiency = min_efficiency/len(self.teams)
 
         max_efficiency = len(self.users) - 1
-        # return (self.get_efficiency()-min_efficiency)/max_efficiency
-        return min_efficiency
+        return (self.get_efficiency())/(max_efficiency)
     
     # Tie strength: average edge weight between people who are in the same team
     def get_tie_strength(self):
@@ -193,6 +192,17 @@ class networkGraph:
             team = [self.clusters[i] for i in t]
             diverse_teams.append(team)
         return diverse_teams
+    
+    def get_utility(self):
+        f = 0
+        for t in self.teams:
+            count_one = 0
+            count_two = 0
+            for m in t:
+                count_one += self.utility_one[m]          # Appends utility values
+                count_two += self.utility_two[m]
+            f += (count_one**2 + count_two**2)/(2*len(t))
+        return f/len(self.teams)
 
     # Generates a random, valid swap move
     def valid_move(self):
@@ -204,17 +214,22 @@ class networkGraph:
         team.append(user)
         for member in team:
             if (not (self.G.has_edge(user, member) or user == member)):
-                self.G.add_weighted_edges_from([(user, member, 1)])
+                self.G.add_weighted_edges_from([(user, member, np.random.normal(0.5))])
     
     def efficiency_tie_strength_obj_eq(self, alpha):
         return alpha*self.get_tie_strength() + (1-alpha)*self.get_efficiency()
 
+    def efficiency_diversity_obj_eq(self, alpha=0.5):
+        return alpha*self.get_norm_efficiency() + (1-alpha)*self.get_norm_diversity()
+    
+    def efficiency_diversity_utility_obj_eq(self, e_w=0.333, d_w=0.333, u_w=0.333):
+        return e_w*self.get_norm_efficiency() + d_w*self.get_norm_diversity() + u_w*self.get_utility()
+
     # Swaps two users if they're in different teams
-    def transform(self, user_a, user_b, alpha):      
+    def transform(self, user_a, user_b, e_w=0.333, d_w=0.333, u_w=0.333):      
         for t in self.teams:
             if user_a in t and user_b in t:
-                # return -self.get_diversity() + self.get_efficiency()*len(self.users)
-                return self.get_norm_diversity()
+                return self.efficiency_diversity_utility_obj_eq(e_w, d_w, u_w)
             elif user_a in t:
                 t.remove(user_a)
                 self.add_user_to_team(user_b, t)
@@ -222,35 +237,57 @@ class networkGraph:
                 t.remove(user_b)
                 self.add_user_to_team(user_a, t)
         
-        return self.get_norm_diversity()
-        # return -self.get_diversity()
+        return self.efficiency_diversity_utility_obj_eq(e_w, d_w, u_w)
 
-    def stochastic_search(self, eps, alpha=0.5):
+    def stochastic_search(self, eps=0.1, e_w=0.333, d_w=0.333, u_w=0.333):
         s_current = []
-        while True:
+        nx.write_gexf(self.G, "start.gexf")
+        diversity = [self.get_diversity()]
+        efficiency = [self.get_efficiency()]
+        utility = [self.get_utility()]
+        for i in range(50):
+            print(i)
             s_candidate = self.valid_move()
 
             G_prime = deepcopy(self)
-            G_prime_transform = G_prime.transform(s_candidate[0], s_candidate[1], alpha)
+            G_prime_transform = G_prime.transform(s_candidate[0], s_candidate[1], e_w, d_w, u_w)
 
-            if (G_prime_transform > self.get_norm_diversity()):
+            if (G_prime_transform > self.efficiency_diversity_utility_obj_eq(e_w, d_w, u_w)):
                 s_current.append(s_candidate)
-                self.transform(s_candidate[0], s_candidate[1], alpha)
+                self.transform(s_candidate[0], s_candidate[1], e_w, d_w, u_w)
+                nx.write_gexf(self.G, "round " + str(i) + ".gexf")
+            
+            diversity.append(self.get_diversity())
+            efficiency.append(self.get_efficiency())
+            utility.append(self.get_utility())
+            # if (random.random() < eps):
+            #     return s_current
+        print(diversity)
+        print(efficiency)
+        print(utility)
 
-            if (random.random() < eps):
-                return s_current
+    
+    def random_assignment(self):
+        diversity = [self.get_diversity()]
+        efficiency = [self.get_efficiency()]
+        utility = [self.get_utility()]
+        for i in range(50):
+            if (random.choice([True, False])):
+                move = self.valid_move()
+                self.transform(move[0], move[1])
+            diversity.append(self.get_diversity())
+            efficiency.append(self.get_efficiency())
+            utility.append(self.get_utility())
+        print(diversity)
+        print(efficiency)
+        print(utility)
 
 if __name__ == '__main__':
-    network = networkGraph(list(range(12)))
-    network.naive_group_assignment(4)
+    network = networkGraph(list(range(50)))
+    network.naive_group_assignment(10)
 
-    # print(network.get_efficiency())
-    print(network.get_norm_diversity())
-    print(network.get_diversity())
-    network.stochastic_search(0.05)
-    print(network.get_norm_diversity())
-    print(network.get_diversity())
-    # print(network.get_efficiency())
+    network_copy = deepcopy(network)
+    network_copy.random_assignment()
+    network.stochastic_search()
 
     # nx.draw(network.G)
-    # plt.show()
