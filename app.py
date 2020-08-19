@@ -1,6 +1,3 @@
-import json
-import os
-import requests
 import random
 import string
 import numpy as np
@@ -8,91 +5,8 @@ import networkx as nx
 import math
 import config
 import statistics
-import matplotlib.pyplot as plt
 from itertools import combinations, permutations
 from copy import deepcopy
-
-class algoTeamsAPI:
-    def __init__(self, network):
-        self.URL = "https://slack.com/api/"
-        self.token = config.token
-        self.headers = {"Content-Type": "application/json", "Authorization": "Bearer {}".format(config.token)}
-        self.network = network
-
-    # Create a new Channel with given users
-    def create_channel(self, channel_name, users):
-        # Create a new channel
-        response = requests.post(
-            url=self.URL + "conversations.create",
-            data=json.dumps({
-                "name": channel_name,
-                "is_private": True
-            }),
-            headers=self.headers
-        )
-
-        response_json = response.json()
-        print(response_json)
-
-        # Invite users to channel
-        requests.post(
-            url=self.URL + "conversations.invite",
-            data=json.dumps({
-                "channel": response_json["channel"]["id"],
-                "users": users
-            }),
-            headers=self.headers
-        )
-
-        # Send welcome message
-        requests.post(
-            url=self.URL+"/chat.postMessage",
-            data=json.dumps({
-                "channel": response_json["channel"]["id"],
-                "text": "Hello there!"
-            }),
-            headers=self.headers
-        )
-        return(response_json)
-    
-    # Invite user to given channel
-    def add_user(self, user, channel):
-        response = requests.post(
-            url=self.url+"/conversations.invite",
-            data=json.dumps({
-                "channel": channel,
-                "user": user
-            })
-        )
-        response_json = response.json()
-        return (response_json["ok"])
-
-    # Remove user from given channel
-    def remove_user(self, user, channel):
-        response = requests.post(
-            url=self.url+"/conversations.kick",
-            data=json.dumps({
-                "channel": channel,
-                "user": user
-            })
-        )
-        response_json = response.json()
-        return (response_json["ok"])
-    
-    # Generates a random string for channel naming
-    def random_string(self, string_length=8):
-        return ''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(string_length))
-    
-    # Splits users into num_channel channels
-    def naive_group_assignment(self, num_channel):
-        network.naive_group_assignment(num_channel)
-        user_arrays = [', '.join(group) for group in network.teams]
-
-        for group in user_arrays:
-            name = self.random_string()
-        #     self.create_channel(name, group)
-
-        return split_user_arrays
 
 class networkGraph:
     def __init__(self, users):
@@ -107,13 +21,13 @@ class networkGraph:
 
         for user in self.users:
             if self.clusters[user] == 'a':
-                self.G.nodes[user]['viz'] = {'color': {'r': 255, 'g': 0, 'b': 0, 'a': 0}}
+                self.G.nodes[user]['viz'] = {'color': {'r': 255, 'g': 0, 'b': 0, 'a': 0.6}}
             elif self.clusters[user] == 'b':
-                self.G.nodes[user]['viz'] = {'color': {'r': 0, 'g': 255, 'b': 0, 'a': 0}}
+                self.G.nodes[user]['viz'] = {'color': {'r': 0, 'g': 255, 'b': 0, 'a': 0.6}}
             elif self.clusters[user] == 'c':
-                self.G.nodes[user]['viz'] = {'color': {'r': 0, 'g': 0, 'b': 255, 'a': 0}}
+                self.G.nodes[user]['viz'] = {'color': {'r': 0, 'g': 0, 'b': 255, 'a': 0.6}}
             elif self.clusters[user] == 'd':
-                self.G.nodes[user]['viz'] = {'color': {'r': 0, 'g': 0, 'b': 0, 'a': 255}}
+                self.G.nodes[user]['viz'] = {'color': {'r': 128, 'g': 0, 'b': 128, 'a': 0.6}}
         
     def naive_group_assignment(self, num_channel):
         random.shuffle(self.users)
@@ -123,7 +37,7 @@ class networkGraph:
             pairs = combinations(t, 2)
             
             for p in pairs:
-                self.G.add_weighted_edges_from([(p[0], p[1], np.random.normal(0.5))])
+                self.G.add_weighted_edges_from([(p[0], p[1], 1)])
             
             # self.B.add_node('TEAM ' + str(i))
             # for member in t:
@@ -201,7 +115,7 @@ class networkGraph:
             for m in t:
                 count_one += self.utility_one[m]          # Appends utility values
                 count_two += self.utility_two[m]
-            f += (count_one**2 + count_two**2)/(2*len(t))
+            f += ((count_one/len(t))**2 + (count_two/len(t))**2)/2
         return f/len(self.teams)
 
     # Generates a random, valid swap move
@@ -214,7 +128,7 @@ class networkGraph:
         team.append(user)
         for member in team:
             if (not (self.G.has_edge(user, member) or user == member)):
-                self.G.add_weighted_edges_from([(user, member, np.random.normal(0.5))])
+                self.G.add_weighted_edges_from([(user, member, 1)])
     
     def efficiency_tie_strength_obj_eq(self, alpha):
         return alpha*self.get_tie_strength() + (1-alpha)*self.get_efficiency()
@@ -238,14 +152,34 @@ class networkGraph:
                 self.add_user_to_team(user_a, t)
         
         return self.efficiency_diversity_utility_obj_eq(e_w, d_w, u_w)
+    
+    def color_initialisation(self):
+        for e in self.G.edges:
+            self.G.edges[e]['viz'] = {'color': {'r': 0, 'g': 0, 'b': 0, 'a': 0.5}}
+            self.G.edges[e]['start'] = 1
 
-    def stochastic_search(self, eps=0.1, e_w=0.333, d_w=0.333, u_w=0.333):
+    def color_team_edges(self, i):
+        membership = dict()
+        for t in self.teams:
+            for u in t:
+                membership[u] = t
+    
+        for e in self.G.edges:
+            if membership[e[0]] == membership[e[1]]:
+                self.G.edges[e]['viz'] = {'color': {'r': 0, 'g': 0, 'b': 0, 'a': 0.5}}
+                if 'start' not in self.G.edges[e]:
+                    self.G.edges[e]['start'] = i+2
+
+    def stochastic_search(self, eps=0.1, e_w=0, d_w=1, u_w=0):
         s_current = []
-        nx.write_gexf(self.G, "start.gexf")
+
+        self.color_initialisation()
+
         diversity = [self.get_diversity()]
         efficiency = [self.get_efficiency()]
         utility = [self.get_utility()]
-        for i in range(50):
+
+        for i in range(10):
             print(i)
             s_candidate = self.valid_move()
 
@@ -255,13 +189,16 @@ class networkGraph:
             if (G_prime_transform > self.efficiency_diversity_utility_obj_eq(e_w, d_w, u_w)):
                 s_current.append(s_candidate)
                 self.transform(s_candidate[0], s_candidate[1], e_w, d_w, u_w)
-                nx.write_gexf(self.G, "round " + str(i) + ".gexf")
+                self.color_team_edges(i)
             
             diversity.append(self.get_diversity())
             efficiency.append(self.get_efficiency())
             utility.append(self.get_utility())
+
             # if (random.random() < eps):
             #     return s_current
+
+        nx.write_gexf(self.G, "diversity.gexf")
         print(diversity)
         print(efficiency)
         print(utility)
@@ -271,7 +208,8 @@ class networkGraph:
         diversity = [self.get_diversity()]
         efficiency = [self.get_efficiency()]
         utility = [self.get_utility()]
-        for i in range(50):
+        for i in range(8):
+            print (i)
             if (random.choice([True, False])):
                 move = self.valid_move()
                 self.transform(move[0], move[1])
@@ -283,11 +221,12 @@ class networkGraph:
         print(utility)
 
 if __name__ == '__main__':
-    network = networkGraph(list(range(50)))
-    network.naive_group_assignment(10)
+    network = networkGraph(list(range(20)))
+    network.naive_group_assignment(5)
+    # network.color_team_edges("start.gexf")
 
-    network_copy = deepcopy(network)
-    network_copy.random_assignment()
+    # network_copy = deepcopy(network)
+    # network_copy.random_assignment()
     network.stochastic_search()
 
     # nx.draw(network.G)
