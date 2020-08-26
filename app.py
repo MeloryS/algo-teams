@@ -5,6 +5,7 @@ import networkx as nx
 import math
 import config
 import statistics
+import threading
 from itertools import combinations, permutations
 from copy import deepcopy
 
@@ -116,7 +117,7 @@ class networkGraph:
                 count_one += self.utility_one[m]          # Appends utility values
                 count_two += self.utility_two[m]
             f += ((count_one/len(t))**2 + (count_two/len(t))**2)/2
-        return f/len(self.teams)
+        return 1-(f/len(self.teams))
 
     # Generates a random, valid swap move
     def valid_move(self):
@@ -136,11 +137,11 @@ class networkGraph:
     def efficiency_diversity_obj_eq(self, alpha=0.5):
         return alpha*self.get_norm_efficiency() + (1-alpha)*self.get_norm_diversity()
     
-    def efficiency_diversity_utility_obj_eq(self, e_w=0.333, d_w=0.333, u_w=0.333):
+    def efficiency_diversity_utility_obj_eq(self, e_w=1, d_w=1, u_w=1):
         return e_w*self.get_norm_efficiency() + d_w*self.get_norm_diversity() + u_w*self.get_utility()
 
     # Swaps two users if they're in different teams
-    def transform(self, user_a, user_b, e_w=0.333, d_w=0.333, u_w=0.333):      
+    def transform(self, user_a, user_b, e_w=1, d_w=1, u_w=1):      
         for t in self.teams:
             if user_a in t and user_b in t:
                 return self.efficiency_diversity_utility_obj_eq(e_w, d_w, u_w)
@@ -153,12 +154,17 @@ class networkGraph:
         
         return self.efficiency_diversity_utility_obj_eq(e_w, d_w, u_w)
     
-    def color_initialisation(self):
+    def graph_initialisation(self):
         for e in self.G.edges:
-            self.G.edges[e]['viz'] = {'color': {'r': 0, 'g': 0, 'b': 0, 'a': 0.5}}
+            # self.G.edges[e]['viz'] = {'color': {'r': 0, 'g': 0, 'b': 0, 'a': 0.5}}
             self.G.edges[e]['start'] = 1
+    
+    def graph_team_change(self):
+        for i in range(len(self.teams)):
+            for u in self.teams[i]:
+                self.G.nodes[u]['team'] = i
 
-    def color_team_edges(self, i):
+    def team_edges(self, i):
         membership = dict()
         for t in self.teams:
             for u in t:
@@ -166,30 +172,34 @@ class networkGraph:
     
         for e in self.G.edges:
             if membership[e[0]] == membership[e[1]]:
-                self.G.edges[e]['viz'] = {'color': {'r': 0, 'g': 0, 'b': 0, 'a': 0.5}}
+                # self.G.edges[e]['viz'] = {'color': {'r': 0, 'g': 0, 'b': 0, 'a': 0.5}}
                 if 'start' not in self.G.edges[e]:
                     self.G.edges[e]['start'] = i+2
 
-    def stochastic_search(self, eps=0.1, e_w=0, d_w=1, u_w=0):
+    def stochastic_search(self, e_w=0.5, d_w=1, u_w=1):
         s_current = []
-
-        self.color_initialisation()
 
         diversity = [self.get_diversity()]
         efficiency = [self.get_efficiency()]
         utility = [self.get_utility()]
+        obj = [self.efficiency_diversity_utility_obj_eq(e_w, d_w, u_w)]
 
-        for i in range(10):
+        for i in range(15):
             print(i)
             s_candidate = self.valid_move()
 
             G_prime = deepcopy(self)
             G_prime_transform = G_prime.transform(s_candidate[0], s_candidate[1], e_w, d_w, u_w)
+            
+            G_transform = self.efficiency_diversity_utility_obj_eq(e_w, d_w, u_w)
 
-            if (G_prime_transform > self.efficiency_diversity_utility_obj_eq(e_w, d_w, u_w)):
+            if (G_prime_transform > G_transform):
                 s_current.append(s_candidate)
                 self.transform(s_candidate[0], s_candidate[1], e_w, d_w, u_w)
-                self.color_team_edges(i)
+                self.team_edges(i)
+                obj.append(G_prime_transform)
+            else:
+                obj.append(G_transform)
             
             diversity.append(self.get_diversity())
             efficiency.append(self.get_efficiency())
@@ -198,17 +208,19 @@ class networkGraph:
             # if (random.random() < eps):
             #     return s_current
 
-        nx.write_gexf(self.G, "diversity.gexf")
+        nx.write_gexf(self.G, "stochastic.gexf")
         print(diversity)
         print(efficiency)
         print(utility)
-
+        print(obj)
     
     def random_assignment(self):
         diversity = [self.get_diversity()]
         efficiency = [self.get_efficiency()]
         utility = [self.get_utility()]
-        for i in range(8):
+        obj = [self.efficiency_diversity_utility_obj_eq(e_w=0.5, d_w=1, u_w=1)]
+
+        for i in range(15):
             print (i)
             if (random.choice([True, False])):
                 move = self.valid_move()
@@ -216,17 +228,23 @@ class networkGraph:
             diversity.append(self.get_diversity())
             efficiency.append(self.get_efficiency())
             utility.append(self.get_utility())
+            obj.append(self.efficiency_diversity_utility_obj_eq(e_w=0.5, d_w=1, u_w=1))
+
+        nx.write_gexf(self.G, "random.gexf")
         print(diversity)
         print(efficiency)
         print(utility)
+        print(obj)
 
 if __name__ == '__main__':
-    network = networkGraph(list(range(20)))
-    network.naive_group_assignment(5)
-    # network.color_team_edges("start.gexf")
+    network = networkGraph(list(range(24)))
+    network.naive_group_assignment(6)
+    network.graph_initialisation()
 
-    # network_copy = deepcopy(network)
-    # network_copy.random_assignment()
+    network_copy = deepcopy(network)
+    print("RANDOM")
+    network_copy.random_assignment()
+    print("STOCHASTIC")
     network.stochastic_search()
 
     # nx.draw(network.G)
